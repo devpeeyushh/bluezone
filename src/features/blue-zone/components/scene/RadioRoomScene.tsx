@@ -89,6 +89,9 @@ export const RadioRoomScene: React.FC = () => {
     >
       <Canvas
         shadows
+        // Modals cover the viewport with a blurred backdrop: stop the 60fps render loop behind them
+        // ("demand" still redraws on resize/invalidate so the backdrop never goes stale).
+        frameloop={isModalOpen ? "demand" : "always"}
         className="w-full h-full cursor-crosshair"
         onPointerDown={(e) => {
           if (e.target === e.currentTarget && controlsMode === "orbit") {

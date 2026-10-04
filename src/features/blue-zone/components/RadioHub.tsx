@@ -16,6 +16,7 @@ import { RADIO_STATIONS } from "../data/mockRadioData";
 import { useBlueZoneStore } from "../store/useBlueZoneStore";
 import { sound } from "../utils/sound";
 import { getStationStatus } from "../utils/stationStatus";
+import { BlueZoneCompletionPayload } from "../types/integration.types";
 
 // Dynamically import 3D Canvas to disable SSR cleanly
 const RadioRoomScene = dynamic(
@@ -35,7 +36,7 @@ const RadioRoomScene = dynamic(
 
 interface RadioHubProps {
   onExit?: () => void;
-  onComplete?: () => void;
+  onComplete?: (payload: BlueZoneCompletionPayload) => void;
 }
 
 export const RadioHub: React.FC<RadioHubProps> = ({ onExit, onComplete }) => {

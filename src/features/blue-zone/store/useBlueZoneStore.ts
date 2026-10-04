@@ -190,7 +190,7 @@ export const useBlueZoneStore = create<BlueZoneState>((set) => ({
       completed: val,
       discoveredBroadcastFacts: [
         "SOURCE: AUTOMATIC SYSTEM",
-        "TRIGGER: UNAUTHORIZED ACCESS ATTEMPT",
+        "TRIGGER: UNAUTHORIZED ACCESS",
         "ORIGIN: FORENSICS EVIDENCE VAULT",
       ],
     })),

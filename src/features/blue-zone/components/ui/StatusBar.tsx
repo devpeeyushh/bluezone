@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { Volume2, VolumeX, Radio, LogOut, CheckCircle2, GitBranch } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { useBlueZoneStore } from "../../store/useBlueZoneStore";
@@ -40,14 +40,15 @@ export const StatusBar: React.FC<StatusBarProps> = ({ onExit }) => {
       sessionActive: s.sessionActive,
     }))
   );
-  const [timestamp, setTimestamp] = useState("");
+  // SYS_CLOCK ticks every 100ms. It writes straight to the DOM node instead of React state,
+  // so the whole status bar no longer re-renders 10 times per second.
+  const clockRef = useRef<HTMLSpanElement | null>(null);
 
   useEffect(() => {
     const updateTime = () => {
+      if (!clockRef.current) return;
       const now = new Date();
-      setTimestamp(
-        `${now.toISOString().slice(11, 19)}.${Math.floor(now.getMilliseconds() / 100)}Z`
-      );
+      clockRef.current.textContent = `${now.toISOString().slice(11, 19)}.${Math.floor(now.getMilliseconds() / 100)}Z`;
     };
     updateTime();
     const timer = setInterval(updateTime, 100);
@@ -119,7 +120,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({ onExit }) => {
       <div className="flex items-center gap-4">
         <div className="text-right hidden 2xl:block">
           <span className="text-radio-textMuted mr-2">SYS_CLOCK:</span>
-          <span className="text-radio-textBright">{timestamp || "00:00:00.0Z"}</span>
+          <span ref={clockRef} className="text-radio-textBright">00:00:00.0Z</span>
         </div>
 
         {/* Session Countdown Timer (atmospheric constraint only: no score, no ranking) */}

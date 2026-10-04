@@ -175,7 +175,7 @@ export const InteractiveStation: React.FC<InteractiveStationProps> = ({
 
       {/* Floating 3D HUD Tag (fades out while in interaction range: distanceFactor makes it huge up close,
           and the [E] prompt below the crosshair already shows name + status) */}
-      <Html position={[0, 0.95, 0]} center distanceFactor={7} zIndexRange={[16, 0]}>
+      <Html position={[0, 0.95, 0]} center distanceFactor={7} zIndexRange={[16, 0]} occlude>
         <div
           onClick={handleClick}
           className={`px-2.5 py-1 rounded bg-black/85 backdrop-blur-sm border transition-all duration-200 select-none cursor-pointer whitespace-nowrap text-center ${

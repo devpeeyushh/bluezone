@@ -25,6 +25,13 @@ const MAX_MOUSE_DELTA = 250;
 // Frame-time cap so a hitch (tab switch, GC pause) cannot tunnel the player through obstacles
 const MAX_FRAME_DELTA = 0.05;
 
+// Scratch objects reused every frame (only one player exists), so movement allocates nothing per frame
+const _moveDir = new THREE.Vector3();
+const _forward = new THREE.Vector3();
+const _right = new THREE.Vector3();
+const _yaw = new THREE.Euler();
+const _next = new THREE.Vector3();
+
 const isModalOpenNow = () => {
   const s = useBlueZoneStore.getState();
   return Boolean(s.activeStation || s.investigationBoardOpen);
@@ -232,7 +239,7 @@ export const FirstPersonPlayer: React.FC<FirstPersonPlayerProps> = ({ isLocked, 
     // Calculate movement vector
     const sprinting = keys.current["ShiftLeft"] || keys.current["ShiftRight"];
     const speed = (sprinting ? BLUE_ZONE_CONFIG.PLAYER.MOVE_SPEED * BLUE_ZONE_CONFIG.PLAYER.SPRINT_MULTIPLIER : BLUE_ZONE_CONFIG.PLAYER.MOVE_SPEED) * delta;
-    const moveDir = new THREE.Vector3(0, 0, 0);
+    const moveDir = _moveDir.set(0, 0, 0);
 
     if (keys.current["KeyW"] || keys.current["ArrowUp"]) moveDir.z -= 1;
     if (keys.current["KeyS"] || keys.current["ArrowDown"]) moveDir.z += 1;
@@ -243,18 +250,23 @@ export const FirstPersonPlayer: React.FC<FirstPersonPlayerProps> = ({ isLocked, 
       moveDir.normalize();
 
       // Transform direction according to horizontal yaw
-      const forward = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(0, euler.current.y, 0));
-      const right = new THREE.Vector3(1, 0, 0).applyEuler(new THREE.Euler(0, euler.current.y, 0));
+      _yaw.set(0, euler.current.y, 0);
+      const forward = _forward.set(0, 0, -1).applyEuler(_yaw);
+      const right = _right.set(1, 0, 0).applyEuler(_yaw);
 
       const displacement = forward.multiplyScalar(-moveDir.z * speed).add(right.multiplyScalar(moveDir.x * speed));
+      const dx = displacement.x;
+      const dz = displacement.z;
 
       // Separate X and Z movement for slide-along-wall collision response
-      const nextX = playerPos.current.clone().add(new THREE.Vector3(displacement.x, 0, 0));
+      const nextX = _next.copy(playerPos.current);
+      nextX.x += dx;
       if (!checkCollision(nextX)) {
         playerPos.current.x = nextX.x;
       }
 
-      const nextZ = playerPos.current.clone().add(new THREE.Vector3(0, 0, displacement.z));
+      const nextZ = _next.copy(playerPos.current);
+      nextZ.z += dz;
       if (!checkCollision(nextZ)) {
         playerPos.current.z = nextZ.z;
       }

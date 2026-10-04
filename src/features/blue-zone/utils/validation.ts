@@ -59,7 +59,7 @@ export function validateChallenge2(
   if (isTargetLog && !isFreqAligned) {
     return {
       success: false,
-      message: `CARRIER DESYNC: Log anomaly identified, but receiver tuned to ${carrierFreqMhz.toFixed(2)} MHz. Align carrier to emergency band (156.30 MHz).`,
+      message: `CARRIER DESYNC: Log anomaly identified, but receiver tuned to ${carrierFreqMhz.toFixed(2)} MHz. Align the receiver to the carrier band recorded for that transmission.`,
     };
   }
 

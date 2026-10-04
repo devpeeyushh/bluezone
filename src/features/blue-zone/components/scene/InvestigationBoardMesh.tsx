@@ -105,6 +105,7 @@ export const InvestigationBoardMesh: React.FC<InvestigationBoardMeshProps> = ({
         center
         distanceFactor={6}
         zIndexRange={[16, 0]}
+        occlude
         className="pointer-events-none select-none font-mono"
       >
         <div className={`flex flex-col items-center bg-black/85 border rounded px-3 py-2 text-center backdrop-blur-md min-w-[200px] transition-all duration-300 ${

@@ -1,4 +1,4 @@
-import { BlueZone } from "@/features/blue-zone/components/BlueZoneRoot";
+import { BlueZone } from "@/features/blue-zone";
 
 export default function BlueZonePage() {
   return <BlueZone />;

@@ -297,7 +297,7 @@ export const NetworkMapModal: React.FC<Props> = ({ onClose }) => {
             </div>
 
             <div className="text-[10px] text-slate-500 border-t border-radio-border pt-3 mt-4">
-              TELEMETRY: SANC-0002 contact density represents 100% saturation of Radio sector carrier links.
+              TELEMETRY: Primary nexus contact density represents 100% saturation of Radio sector carrier links.
             </div>
           </div>
         </div>

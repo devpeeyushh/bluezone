@@ -137,10 +137,11 @@ export const NETWORK_CANDIDATE_NODES: NetworkNodeMetric[] = [
   },
   {
     sanctuaryId: "SANC-0015",
-    centralityScore: 0.62,
-    contactChains: 6,
-    collaborationScore: 0.55,
-    sector: "Research",
+    // Values match radioGroundTruth.json (previously displayed as Research / 0.62 / 6 / 0.55)
+    centralityScore: 0.3,
+    contactChains: 0,
+    collaborationScore: 0.59,
+    sector: "Radio",
     isRelayCandidate: false,
   },
 ];

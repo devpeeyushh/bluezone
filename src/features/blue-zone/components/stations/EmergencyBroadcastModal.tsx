@@ -7,10 +7,12 @@ import { useShallow } from "zustand/react/shallow";
 import { sound } from "../../utils/sound";
 import { useModalEntrance } from "../../utils/useModalEntrance";
 import { useBlueZoneStore } from "../../store/useBlueZoneStore";
+import { BLUE_ZONE_COMPLETION } from "../../data/completion";
+import { BlueZoneCompletionPayload } from "../../types/integration.types";
 
 interface Props {
   onClose: () => void;
-  onComplete?: () => void;
+  onComplete?: (payload: BlueZoneCompletionPayload) => void;
 }
 
 // Cinematic stages:
@@ -135,7 +137,7 @@ export const EmergencyBroadcastModal: React.FC<Props> = ({ onClose, onComplete }
       () => {
         setCompleted(true);
         setCinematicStage("complete");
-        onCompleteRef.current?.();
+        onCompleteRef.current?.(BLUE_ZONE_COMPLETION);
       },
       [],
       "+=1.0"
