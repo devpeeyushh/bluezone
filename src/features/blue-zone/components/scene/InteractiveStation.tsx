@@ -10,6 +10,12 @@ import { useBlueZoneStore } from "../../store/useBlueZoneStore";
 import { sound } from "../../utils/sound";
 import { useInteractable } from "../../utils/useInteractable";
 import { getStationStatus } from "../../utils/stationStatus";
+import { damp } from "./environment/envUtils";
+import { presenceNearness } from "./environment/playerPresence";
+import { panFor } from "../../utils/audioSpace";
+
+const SCREEN_IDLE = new THREE.Color("#061322");
+const SCREEN_FOCUS = new THREE.Color("#0e2a4a");
 
 interface InteractiveStationProps {
   station: StationConfig;
@@ -27,6 +33,11 @@ export const InteractiveStation: React.FC<InteractiveStationProps> = ({
   isActive,
 }) => {
   const meshRef = useRef<THREE.Group | null>(null);
+  const lightRef = useRef<THREE.PointLight | null>(null);
+  const screenRef = useRef<THREE.MeshStandardMaterial | null>(null);
+  const hoverLift = useRef(0);
+  // Pointer-over bubbles from each child mesh; one focus cue per hover
+  const lastHoverCue = useRef(0);
   const [hovered, setHovered] = useState(false);
 
   const {
@@ -34,6 +45,7 @@ export const InteractiveStation: React.FC<InteractiveStationProps> = ({
     challenge1Solved,
     challenge2Solved,
     challenge3Solved,
+    ctf03Solved,
     voiceArchiveUnlocked,
     signalMonitorUnlocked,
     networkUnlocked,
@@ -47,6 +59,7 @@ export const InteractiveStation: React.FC<InteractiveStationProps> = ({
       challenge1Solved: s.challenge1Solved,
       challenge2Solved: s.challenge2Solved,
       challenge3Solved: s.challenge3Solved,
+      ctf03Solved: s.ctf03Solved,
       voiceArchiveUnlocked: s.voiceArchiveUnlocked,
       signalMonitorUnlocked: s.signalMonitorUnlocked,
       networkUnlocked: s.networkUnlocked,
@@ -63,6 +76,7 @@ export const InteractiveStation: React.FC<InteractiveStationProps> = ({
     challenge1Solved,
     challenge2Solved,
     challenge3Solved,
+    ctf03Solved,
     voiceArchiveUnlocked,
     signalMonitorUnlocked,
     networkUnlocked,
@@ -72,14 +86,29 @@ export const InteractiveStation: React.FC<InteractiveStationProps> = ({
   const isLocked = status.isLocked;
   const isHighlighted = hovered || isActive || isFocused;
 
-  useFrame(({ clock }) => {
+  // Light, screen glow and the highlight float ease between states instead of snapping.
+  // Proximity adds a little light as the player approaches.
+  const [sx, , sz] = station.position3D;
+  useFrame(({ clock }, rawDelta) => {
+    const dt = Math.min(rawDelta, 0.1);
+    const near = presenceNearness(sx, sz, 2.0, 3.9);
+    hoverLift.current = damp(hoverLift.current, isHighlighted ? 1 : 0, 6, dt);
     if (meshRef.current) {
       const t = clock.getElapsedTime();
-      if (isHighlighted) {
-        meshRef.current.position.y = station.position3D[1] + Math.sin(t * 4) * 0.04;
-      } else {
-        meshRef.current.position.y = station.position3D[1];
-      }
+      meshRef.current.position.y = station.position3D[1] + Math.sin(t * 4) * 0.04 * hoverLift.current;
+    }
+    if (lightRef.current) {
+      // The light sits ~0.25 m from the screen, so locked consoles keep it low (no saturated red slab)
+      const target = (isHighlighted ? 1.35 : isLocked ? 0.1 : 0.85) + near * (isLocked ? 0.06 : 0.2);
+      lightRef.current.intensity = damp(lightRef.current.intensity, target, 5, dt);
+    }
+    if (screenRef.current) {
+      // Up close the screen fills the view, so its glow eases down with proximity (like eye adaptation)
+      // instead of washing out; focus is carried by the light, floor ring, hologram and reticle.
+      // Locked screens stay a dim, unmistakable red rather than a saturated slab
+      const target = (isHighlighted ? 0.56 : isLocked ? 0.15 : 0.48) * (1 - near * 0.42);
+      screenRef.current.emissiveIntensity = damp(screenRef.current.emissiveIntensity, target, 5, dt);
+      screenRef.current.color.lerp(isHighlighted ? SCREEN_FOCUS : SCREEN_IDLE, 1 - Math.exp(-5 * dt));
     }
   });
 
@@ -93,10 +122,7 @@ export const InteractiveStation: React.FC<InteractiveStationProps> = ({
   const handleClick = (e: { stopPropagation: () => void }) => {
     e.stopPropagation();
     if (isPointerLocked()) return;
-    if (audioEnabled) {
-      sound.playStationTone(station.id === "emergency-broadcast" ? 440 : 880);
-      sound.playClick();
-    }
+    // Open / denied cue is played by useFacilityAudio
     onSelect(station.id);
   };
 
@@ -105,7 +131,13 @@ export const InteractiveStation: React.FC<InteractiveStationProps> = ({
     if (isPointerLocked()) return;
     setHovered(true);
     document.body.style.cursor = "pointer";
-    if (audioEnabled) sound.playClick();
+    // Mouse hover is this station's "focus" in orbit mode
+    const now = performance.now();
+    if (audioEnabled && now - lastHoverCue.current > 600) {
+      lastHoverCue.current = now;
+      const solved = status.label === "VERIFIED" || status.label === "COMPLETE";
+      sound.focus(isLocked ? "locked" : solved ? "solved" : "station", panFor(station.position3D[0], station.position3D[2]) * 0.7);
+    }
   };
 
   const handlePointerOut = () => {
@@ -121,10 +153,7 @@ export const InteractiveStation: React.FC<InteractiveStationProps> = ({
     status: status.promptStatus,
     statusColor: status.color,
     requirement: status.requirement,
-    onInteract: () => {
-      if (audioEnabled) sound.playStationTone(station.id === "emergency-broadcast" ? 440 : 880);
-      onSelect(station.id);
-    },
+    onInteract: () => onSelect(station.id),
   });
 
   return (
@@ -151,10 +180,12 @@ export const InteractiveStation: React.FC<InteractiveStationProps> = ({
       {/* CRT Glowing Screen Surface */}
       <mesh position={[0, 0.35, 0.06]} rotation={[-0.2, 0, 0]}>
         <planeGeometry args={[1.1, 0.6]} />
+        {/* Color / emissiveIntensity are eased in useFrame (locked consoles stay dim, available ones brighter) */}
         <meshStandardMaterial
-          color={isHighlighted ? "#0e2a4a" : "#061322"}
+          ref={screenRef}
+          color="#061322"
           emissive={status.color}
-          emissiveIntensity={isHighlighted ? 0.9 : 0.4}
+          emissiveIntensity={isLocked ? 0.15 : 0.48}
           roughness={0.2}
         />
       </mesh>
@@ -167,9 +198,10 @@ export const InteractiveStation: React.FC<InteractiveStationProps> = ({
 
       {/* Point Light casting glow onto the desk */}
       <pointLight
+        ref={lightRef}
         color={status.color}
         distance={2.5}
-        intensity={isHighlighted ? 1.6 : 0.7}
+        intensity={isLocked ? 0.1 : 0.85}
         position={[0, 0.4, 0.3]}
       />
 
@@ -178,9 +210,9 @@ export const InteractiveStation: React.FC<InteractiveStationProps> = ({
       <Html position={[0, 0.95, 0]} center distanceFactor={7} zIndexRange={[16, 0]} occlude>
         <div
           onClick={handleClick}
-          className={`px-2.5 py-1 rounded bg-black/85 backdrop-blur-sm border transition-all duration-200 select-none cursor-pointer whitespace-nowrap text-center ${
+          className={`px-2.5 py-1 rounded bg-[#030b18]/80 backdrop-blur-sm border shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition-all duration-300 ease-out select-none cursor-pointer whitespace-nowrap text-center ${
             isModalOpen || isFocused
-              ? "opacity-0 pointer-events-none"
+              ? "opacity-0 scale-90 translate-y-1 pointer-events-none"
               : isHighlighted
               ? "scale-110 shadow-cyan-glow border-cyan-400 text-white opacity-100"
               : isLocked

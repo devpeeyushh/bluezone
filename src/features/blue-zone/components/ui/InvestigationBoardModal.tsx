@@ -4,7 +4,6 @@ import React from "react";
 import { GitBranch, X, Cpu, Wifi, Share2, ShieldAlert, Lock } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { useBlueZoneStore } from "../../store/useBlueZoneStore";
-import { sound } from "../../utils/sound";
 import { useModalEntrance } from "../../utils/useModalEntrance";
 
 interface Props {
@@ -58,7 +57,7 @@ export const InvestigationBoardModal: React.FC<Props> = ({ onClose }) => {
     challenge3Solved,
     completed,
     broadcastUnlocked,
-    audioEnabled,
+    ctf01Source,
   } = useBlueZoneStore(
     useShallow((s) => ({
       challenge1Solved: s.challenge1Solved,
@@ -66,20 +65,21 @@ export const InvestigationBoardModal: React.FC<Props> = ({ onClose }) => {
       challenge3Solved: s.challenge3Solved,
       completed: s.completed,
       broadcastUnlocked: s.broadcastUnlocked,
-      audioEnabled: s.audioEnabled,
+      // Released by the verified CTF 01 flag (not stored anywhere in the client before that)
+      ctf01Source: s.challengeRewards["blue-zone-ctf-01"]?.source,
     }))
   );
   const panelRef = useModalEntrance<HTMLDivElement>();
 
   const sectionState: Record<"communication" | "signal" | "network" | "broadcast", EvidenceState> = {
     communication: challenge1Solved ? "VERIFIED" : "UNDISCOVERED",
-    signal: challenge2Solved ? "VERIFIED" : challenge1Solved ? "UNDISCOVERED" : "LOCKED",
-    network: challenge3Solved ? "VERIFIED" : challenge2Solved ? "UNDISCOVERED" : "LOCKED",
+    // Order follows the unlock chain: communication → network (CTF 02) → signal
+    network: challenge3Solved ? "VERIFIED" : challenge1Solved ? "UNDISCOVERED" : "LOCKED",
+    signal: challenge2Solved ? "VERIFIED" : challenge3Solved ? "UNDISCOVERED" : "LOCKED",
     broadcast: completed ? "VERIFIED" : broadcastUnlocked ? "DISCOVERED" : "LOCKED",
   };
 
   const handleClose = () => {
-    if (audioEnabled) sound.playClick();
     onClose();
   };
 
@@ -127,7 +127,7 @@ export const InvestigationBoardModal: React.FC<Props> = ({ onClose }) => {
             <div className="flex items-center justify-between border-b border-radio-border pb-2 mb-3">
               <div className="flex items-center gap-2 text-xs font-bold text-radio-cyan">
                 <Cpu className="w-4 h-4 text-radio-cyan" />
-                <span>01 // COMMUNICATION PACKET TRAIL</span>
+                <span>01 // INTERCEPTED TRANSMISSION TRAIL</span>
               </div>
               <EvidenceChip state={sectionState.communication} />
             </div>
@@ -139,18 +139,18 @@ export const InvestigationBoardModal: React.FC<Props> = ({ onClose }) => {
                   ? "border-emerald-500/40 bg-emerald-950/20 text-emerald-300"
                   : "border-slate-700 bg-black/50 text-slate-400"
               }`}>
-                <div className="text-[9px] text-radio-textMuted uppercase mb-1">TRANSMITTER CALLSIGN</div>
+                <div className="text-[9px] text-radio-textMuted uppercase mb-1">NIGHT OPERATOR</div>
                 <div className="text-base font-bold">
                   {challenge1Solved ? "SANC-0003" : "SANC-????"}
                 </div>
                 <div className="text-[10px] mt-1 text-slate-400">
-                  {challenge1Solved ? "Sector 3 (Radio)" : "[CHECKSUM LOSS]"}
+                  {challenge1Solved ? "Sector 3 (Radio) // registered relay volunteer" : "[SIGNATURE CORRUPTED]"}
                 </div>
               </div>
 
               {/* Connecting arrow */}
               <div className="text-center text-xs text-radio-cyan/60 hidden md:block">
-                <span className="block text-[10px] text-radio-textMuted mb-1">4 DISTRESS CALLS</span>
+                <span className="block text-[10px] text-radio-textMuted mb-1">TRANSMISSION_07</span>
                 ──────►
               </div>
 
@@ -160,23 +160,73 @@ export const InvestigationBoardModal: React.FC<Props> = ({ onClose }) => {
                   ? "border-emerald-500/40 bg-emerald-950/20 text-emerald-300"
                   : "border-slate-700 bg-black/50 text-slate-400"
               }`}>
-                <div className="text-[9px] text-radio-textMuted uppercase mb-1">PACKET BETA SIGNATURE</div>
-                <div className="text-xs font-bold">
-                  {challenge1Solved ? "7 ROUTE WARNINGS VERIFIED" : "TRAILER CORRUPTED"}
+                <div className="text-[9px] text-radio-textMuted uppercase mb-1">SOURCE NODE</div>
+                <div className="text-base font-bold">
+                  {challenge1Solved ? ctf01Source ?? "CONFIRMED" : "▒▒▒▒▒▒▒▒-??"}
                 </div>
                 <div className="text-[10px] mt-1 text-slate-400">
-                  {challenge1Solved ? "Correlates with Community evacuation" : "[UNRESOLVED]"}
+                  {challenge1Solved ? "Unregistered relay alias" : "[SOURCE UNKNOWN]"}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* SECTION 2: SIGNAL */}
+          {/* SECTION 2: NETWORK (CTF 02) */}
+          <div className={`p-4 rounded-lg border border-radio-border bg-radio-surface/70 backdrop-blur-sm transition-opacity ${sectionState.network === "LOCKED" ? "opacity-60" : ""}`}>
+            <div className="flex items-center justify-between border-b border-radio-border pb-2 mb-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-cyan-300">
+                <Share2 className="w-4 h-4 text-cyan-300" />
+                <span>02 // COMPROMISED RELAY ROUTE</span>
+              </div>
+              <EvidenceChip state={sectionState.network} />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+              {/* Source Nexus */}
+              <div className={`p-3 rounded border text-center ${
+                challenge3Solved
+                  ? "border-emerald-500/40 bg-emerald-950/20 text-emerald-300"
+                  : "border-slate-700 bg-black/50 text-slate-400"
+              }`}>
+                <div className="text-[9px] text-radio-textMuted uppercase mb-1">RADIO NEXUS NODE</div>
+                <div className="text-base font-bold">
+                  {challenge3Solved ? "SANC-0002" : "NODE-????"}
+                </div>
+                <div className="text-[10px] mt-1 text-slate-400">
+                  {challenge3Solved ? "Named in decrypted relay traffic" : "[PACKET ENCRYPTED]"}
+                </div>
+              </div>
+
+              {/* Connecting arrow */}
+              <div className="text-center text-xs text-cyan-400/70 hidden md:block">
+                <span className="block text-[10px] text-radio-textMuted mb-1">DECRYPTED ROUTE</span>
+                ──────►
+              </div>
+
+              {/* Destination Gateway */}
+              <div className={`p-3 rounded border text-center ${
+                challenge3Solved
+                  ? "border-emerald-500/40 bg-emerald-950/20 text-emerald-300"
+                  : "border-slate-700 bg-black/50 text-slate-400"
+              }`}>
+                <div className="text-[9px] text-radio-textMuted uppercase mb-1">FORENSICS BORDER GATEWAY</div>
+                <div className="text-base font-bold">
+                  {challenge3Solved ? "SANC-0034" : "GATEWAY-????"}
+                </div>
+                <div className="text-[10px] mt-1 text-slate-400">
+                  {challenge3Solved ? "Route still held by the nexus" : "[BORDER ROUTE UNMAPPED]"}
+                </div>
+              </div>
+            </div>
+            {sectionState.network === "LOCKED" && <RequiresNote text="SECTION 01 VERIFIED" />}
+          </div>
+
+          {/* SECTION 3: SIGNAL */}
           <div className={`p-4 rounded-lg border border-radio-border bg-radio-surface/70 backdrop-blur-sm transition-opacity ${sectionState.signal === "LOCKED" ? "opacity-60" : ""}`}>
             <div className="flex items-center justify-between border-b border-radio-border pb-2 mb-3">
               <div className="flex items-center gap-2 text-xs font-bold text-amber-400">
                 <Wifi className="w-4 h-4 text-amber-400" />
-                <span>02 // RF CARRIER FREQUENCY & FAILED TRANSMISSIONS</span>
+                <span>03 // RF CARRIER FREQUENCY & FAILED TRANSMISSIONS</span>
               </div>
               <EvidenceChip state={sectionState.signal} />
             </div>
@@ -218,58 +268,9 @@ export const InvestigationBoardModal: React.FC<Props> = ({ onClose }) => {
                 </div>
               </div>
             </div>
-            {sectionState.signal === "LOCKED" && <RequiresNote text="SECTION 01 VERIFIED" />}
+            {sectionState.signal === "LOCKED" && <RequiresNote text="SECTION 02 VERIFIED" />}
           </div>
 
-          {/* SECTION 3: NETWORK */}
-          <div className={`p-4 rounded-lg border border-radio-border bg-radio-surface/70 backdrop-blur-sm transition-opacity ${sectionState.network === "LOCKED" ? "opacity-60" : ""}`}>
-            <div className="flex items-center justify-between border-b border-radio-border pb-2 mb-3">
-              <div className="flex items-center gap-2 text-xs font-bold text-cyan-300">
-                <Share2 className="w-4 h-4 text-cyan-300" />
-                <span>03 // RESIDENT COORDINATION MESH</span>
-              </div>
-              <EvidenceChip state={sectionState.network} />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-              {/* Source Nexus */}
-              <div className={`p-3 rounded border text-center ${
-                challenge3Solved
-                  ? "border-emerald-500/40 bg-emerald-950/20 text-emerald-300"
-                  : "border-slate-700 bg-black/50 text-slate-400"
-              }`}>
-                <div className="text-[9px] text-radio-textMuted uppercase mb-1">RADIO NEXUS NODE</div>
-                <div className="text-base font-bold">
-                  {challenge3Solved ? "SANC-0002" : "NODE-????"}
-                </div>
-                <div className="text-[10px] mt-1 text-slate-400">
-                  {challenge3Solved ? "Centrality 1.00 // 11 Contact Chains" : "[MAX CENTRALITY UNRESOLVED]"}
-                </div>
-              </div>
-
-              {/* Connecting arrow */}
-              <div className="text-center text-xs text-cyan-400/70 hidden md:block">
-                <span className="block text-[10px] text-radio-textMuted mb-1">CROSS-SECTOR CIRCUIT</span>
-                ──────►
-              </div>
-
-              {/* Destination Gateway */}
-              <div className={`p-3 rounded border text-center ${
-                challenge3Solved
-                  ? "border-emerald-500/40 bg-emerald-950/20 text-emerald-300"
-                  : "border-slate-700 bg-black/50 text-slate-400"
-              }`}>
-                <div className="text-[9px] text-radio-textMuted uppercase mb-1">FORENSICS BORDER GATEWAY</div>
-                <div className="text-base font-bold">
-                  {challenge3Solved ? "SANC-0034" : "GATEWAY-????"}
-                </div>
-                <div className="text-[10px] mt-1 text-slate-400">
-                  {challenge3Solved ? "Centrality 0.94 // 11 Contact Chains" : "[BORDER ROUTE UNMAPPED]"}
-                </div>
-              </div>
-            </div>
-            {sectionState.network === "LOCKED" && <RequiresNote text="SECTION 02 VERIFIED" />}
-          </div>
 
           {/* SECTION 4: BROADCAST */}
           <div className={`p-4 rounded-lg border border-red-500/40 bg-red-950/15 backdrop-blur-sm transition-opacity ${sectionState.broadcast === "LOCKED" ? "opacity-60" : ""}`}>

@@ -45,10 +45,7 @@ export const HintModal: React.FC<HintModalProps> = ({
   const currentUnlockedLevel = activeHints[challengeId] || 0;
 
   const handleRequestNextHint = () => {
-    if (audioEnabled) {
-      sound.playStationTone(800);
-      sound.playClick();
-    }
+    if (audioEnabled) sound.hint();
     requestHint(challengeId);
   };
 

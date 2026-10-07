@@ -7,6 +7,8 @@ import { useShallow } from "zustand/react/shallow";
 import { BLUE_ZONE_CONFIG } from "../../data/config";
 import { useBlueZoneStore } from "../../store/useBlueZoneStore";
 import { getNearestInteractable, InteractableRegistration } from "../../utils/useInteractable";
+import { usePrefersReducedMotion } from "./environment/envUtils";
+import { playerPresence } from "./environment/playerPresence";
 
 // Camera pose kept by the parent so toggling Orbit <-> First Person does not respawn the player
 export interface PlayerPose {
@@ -31,6 +33,20 @@ const _forward = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _yaw = new THREE.Euler();
 const _next = new THREE.Vector3();
+const _wish = new THREE.Vector2();
+
+// Very subtle head-bob while walking (camera height only; collision/interaction use playerPos)
+const HEAD_BOB_AMPLITUDE = 0.018;
+const HEAD_BOB_FREQUENCY = 6.5; // radians per metre walked
+
+// Movement feel only: top speeds are unchanged, velocity just eases toward them (and back to rest).
+// Stopping distance at walk speed is ~0.2 m, so the player never drifts noticeably.
+const ACCELERATION_RESPONSE = 16;
+const DECELERATION_RESPONSE = 20;
+const REDUCED_MOTION_RESPONSE = 40;
+// Sprinting widens the view by a couple of degrees (off under reduced motion)
+const SPRINT_FOV_BOOST = 2.5;
+const SPRINT_SPEED = BLUE_ZONE_CONFIG.PLAYER.MOVE_SPEED * BLUE_ZONE_CONFIG.PLAYER.SPRINT_MULTIPLIER;
 
 const isModalOpenNow = () => {
   const s = useBlueZoneStore.getState();
@@ -58,6 +74,14 @@ export const FirstPersonPlayer: React.FC<FirstPersonPlayerProps> = ({ isLocked, 
   const euler = useRef(new THREE.Euler(0, 0, 0, "YXZ"));
   const keys = useRef<Record<string, boolean>>({});
   const lastPromptSignature = useRef("");
+  const bob = useRef({ phase: 0, amp: 0 });
+  const velocity = useRef(new THREE.Vector2());
+  const baseFov = useRef<number | null>(null);
+  const reducedMotion = usePrefersReducedMotion();
+  const reducedMotionRef = useRef(reducedMotion);
+  useEffect(() => {
+    reducedMotionRef.current = reducedMotion;
+  }, [reducedMotion]);
 
   // Setup initial camera orientation (restores the previous first-person pose if one exists)
   useEffect(() => {
@@ -68,8 +92,17 @@ export const FirstPersonPlayer: React.FC<FirstPersonPlayerProps> = ({ isLocked, 
       camera.rotation.set(0, 0, 0);
     }
     euler.current.setFromQuaternion(camera.quaternion);
+    const perspective = camera as THREE.PerspectiveCamera;
+    baseFov.current = perspective.fov;
 
     return () => {
+      // Hand the shared camera back exactly as we found it (Orbit mode reuses it)
+      if (baseFov.current !== null && perspective.fov !== baseFov.current) {
+        perspective.fov = baseFov.current;
+        perspective.updateProjectionMatrix();
+      }
+      playerPresence.active = 0;
+      playerPresence.speed = 0;
       // Save from our own yaw/pitch state, not the camera: OrbitControls re-aims the shared camera
       // while it is being created, which happens before this cleanup runs.
       poseRef.current = {
@@ -221,24 +254,62 @@ export const FirstPersonPlayer: React.FC<FirstPersonPlayerProps> = ({ isLocked, 
     );
   };
 
+  // Bob eases in while walking and settles gently back to eye height when stopped (off under reduced motion)
+  const applyHeadBob = (moved: number, delta: number) => {
+    const b = bob.current;
+    const walking = moved > 0.0005 && !reducedMotionRef.current;
+    const targetAmp = walking ? HEAD_BOB_AMPLITUDE : 0;
+    b.amp += (targetAmp - b.amp) * Math.min(1, delta * (walking ? 8 : 5));
+    b.phase += moved * HEAD_BOB_FREQUENCY;
+    camera.position.y = playerPos.current.y + Math.sin(b.phase) * b.amp;
+  };
+
+  // Subtle sprint response: a couple of degrees of extra field of view, eased in and out
+  const applySprintFov = (speedRatio: number, delta: number) => {
+    const base = baseFov.current;
+    if (base === null) return;
+    const perspective = camera as THREE.PerspectiveCamera;
+    const boost = reducedMotionRef.current ? 0 : Math.max(0, (speedRatio - 0.72) / 0.28) * SPRINT_FOV_BOOST;
+    const next = perspective.fov + (base + boost - perspective.fov) * Math.min(1, delta * 6);
+    if (Math.abs(next - perspective.fov) > 0.0005) {
+      perspective.fov = Math.abs(next - base) < 0.001 ? base : next;
+      perspective.updateProjectionMatrix();
+    }
+  };
+
+  const publishPresence = (delta: number) => {
+    playerPresence.x = playerPos.current.x;
+    playerPresence.z = playerPos.current.z;
+    playerPresence.active += (1 - playerPresence.active) * Math.min(1, delta * 3);
+    playerPresence.speed = Math.min(1, velocity.current.length() / SPRINT_SPEED);
+  };
+
   useFrame((_, rawDelta) => {
     // If modal is active: strictly disable movement, prompts, and updates
     if (isModalOpen) {
       publishPrompt(null);
+      // Return to the exact same pose afterwards, without leftover momentum
+      velocity.current.set(0, 0);
       return;
     }
 
     // Check nearest interactable station to populate HUD prompt
     publishPrompt(getNearestInteractable(playerPos.current));
 
-    // Only process translation if pointer is actively locked to the canvas
-    if (!isLocked) return;
-
     const delta = Math.min(rawDelta, MAX_FRAME_DELTA);
 
-    // Calculate movement vector
+    // Only process translation if pointer is actively locked to the canvas
+    if (!isLocked) {
+      velocity.current.set(0, 0);
+      applyHeadBob(0, delta);
+      applySprintFov(0, delta);
+      publishPresence(delta);
+      return;
+    }
+
+    // Desired velocity from input (same speeds as before)
     const sprinting = keys.current["ShiftLeft"] || keys.current["ShiftRight"];
-    const speed = (sprinting ? BLUE_ZONE_CONFIG.PLAYER.MOVE_SPEED * BLUE_ZONE_CONFIG.PLAYER.SPRINT_MULTIPLIER : BLUE_ZONE_CONFIG.PLAYER.MOVE_SPEED) * delta;
+    const maxSpeed = sprinting ? SPRINT_SPEED : BLUE_ZONE_CONFIG.PLAYER.MOVE_SPEED;
     const moveDir = _moveDir.set(0, 0, 0);
 
     if (keys.current["KeyW"] || keys.current["ArrowUp"]) moveDir.z -= 1;
@@ -246,34 +317,59 @@ export const FirstPersonPlayer: React.FC<FirstPersonPlayerProps> = ({ isLocked, 
     if (keys.current["KeyA"] || keys.current["ArrowLeft"]) moveDir.x -= 1;
     if (keys.current["KeyD"] || keys.current["ArrowRight"]) moveDir.x += 1;
 
-    if (moveDir.lengthSq() > 0) {
+    const wish = _wish.set(0, 0);
+    const hasInput = moveDir.lengthSq() > 0;
+    if (hasInput) {
       moveDir.normalize();
 
       // Transform direction according to horizontal yaw
       _yaw.set(0, euler.current.y, 0);
       const forward = _forward.set(0, 0, -1).applyEuler(_yaw);
       const right = _right.set(1, 0, 0).applyEuler(_yaw);
+      const dir = forward.multiplyScalar(-moveDir.z).add(right.multiplyScalar(moveDir.x));
+      wish.set(dir.x * maxSpeed, dir.z * maxSpeed);
+    }
 
-      const displacement = forward.multiplyScalar(-moveDir.z * speed).add(right.multiplyScalar(moveDir.x * speed));
-      const dx = displacement.x;
-      const dz = displacement.z;
+    // Ease the actual velocity toward the desired one (short acceleration / deceleration)
+    const vel = velocity.current;
+    const response = reducedMotionRef.current
+      ? REDUCED_MOTION_RESPONSE
+      : hasInput
+        ? ACCELERATION_RESPONSE
+        : DECELERATION_RESPONSE;
+    const k = 1 - Math.exp(-response * delta);
+    vel.x += (wish.x - vel.x) * k;
+    vel.y += (wish.y - vel.y) * k;
+    if (!hasInput && vel.lengthSq() < 0.0004) vel.set(0, 0);
+
+    if (vel.x !== 0 || vel.y !== 0) {
+      const dx = vel.x * delta;
+      const dz = vel.y * delta;
 
       // Separate X and Z movement for slide-along-wall collision response
       const nextX = _next.copy(playerPos.current);
       nextX.x += dx;
       if (!checkCollision(nextX)) {
         playerPos.current.x = nextX.x;
+      } else {
+        vel.x = 0;
       }
 
       const nextZ = _next.copy(playerPos.current);
       nextZ.z += dz;
       if (!checkCollision(nextZ)) {
         playerPos.current.z = nextZ.z;
+      } else {
+        vel.y = 0;
       }
-
-      camera.position.x = playerPos.current.x;
-      camera.position.z = playerPos.current.z;
     }
+
+    const moved = Math.hypot(playerPos.current.x - camera.position.x, playerPos.current.z - camera.position.z);
+    camera.position.x = playerPos.current.x;
+    camera.position.z = playerPos.current.z;
+    applyHeadBob(moved, delta);
+    applySprintFov(vel.length() / SPRINT_SPEED, delta);
+    publishPresence(delta);
   });
 
   return null;

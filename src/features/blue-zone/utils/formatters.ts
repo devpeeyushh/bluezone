@@ -1,9 +1,3 @@
-export function formatStressIndex(val: number): { label: string; color: string } {
-  if (val > 0.8) return { label: `${(val * 100).toFixed(0)}% CRITICAL`, color: "text-red-400 border-red-500/50 bg-red-950/40" };
-  if (val > 0.5) return { label: `${(val * 100).toFixed(0)}% ELEVATED`, color: "text-amber-400 border-amber-500/50 bg-amber-950/40" };
-  return { label: `${(val * 100).toFixed(0)}% NORMAL`, color: "text-cyan-400 border-cyan-500/50 bg-cyan-950/40" };
-}
-
 export function formatStatusBadge(status: string): { text: string; bg: string } {
   switch (status) {
     case "AVAILABLE":

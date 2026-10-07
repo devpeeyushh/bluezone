@@ -5,6 +5,8 @@ import { Volume2, VolumeX, Radio, LogOut, CheckCircle2, GitBranch } from "lucide
 import { useShallow } from "zustand/react/shallow";
 import { useBlueZoneStore } from "../../store/useBlueZoneStore";
 import { sound } from "../../utils/sound";
+import motion from "./hudMotion.module.css";
+import { requestHubExit } from "../../utils/hubTransitions";
 
 interface StatusBarProps {
   onExit?: () => void;
@@ -63,9 +65,12 @@ export const StatusBar: React.FC<StatusBarProps> = ({ onExit }) => {
   };
 
   const handleExit = () => {
-    if (audioEnabled) sound.playRadioSquelch();
-    exitHub();
-    if (onExit) onExit();
+    if (audioEnabled) sound.shutdown();
+    // Same exitHub() + onExit() as before, after a short shutdown fade
+    requestHubExit(() => {
+      exitHub();
+      if (onExit) onExit();
+    });
   };
 
   // Session timer ticker (persists through station interaction).
@@ -90,7 +95,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({ onExit }) => {
   const solvedCount = (challenge1Solved ? 1 : 0) + (challenge2Solved ? 1 : 0) + (challenge3Solved ? 1 : 0);
 
   return (
-    <header className="w-full bg-radio-dark/90 backdrop-blur-md border-b border-radio-border px-4 py-2 flex flex-wrap items-center justify-between gap-y-2 text-xs font-mono text-radio-text select-none z-30">
+    <header className="w-full bg-radio-dark/75 backdrop-blur-md border-b border-radio-border/80 shadow-[0_1px_0_rgba(0,240,255,0.04),0_8px_24px_rgba(0,0,0,0.25)] px-4 py-2 flex flex-wrap items-center justify-between gap-y-2 text-xs font-mono text-radio-text select-none z-30">
       {/* Sector identity */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2 text-radio-cyan font-bold tracking-wider">
@@ -102,7 +107,11 @@ export const StatusBar: React.FC<StatusBarProps> = ({ onExit }) => {
           RADIO COMMUNICATION SECTOR
         </span>
         <span className="text-radio-border hidden xl:inline">|</span>
-        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded border border-cyan-500/40 bg-cyan-950/20 text-radio-cyan">
+        {/* Keyed on the count: each reconstructed piece of evidence sends one ring out from the chip */}
+        <div
+          key={solvedCount}
+          className={`flex items-center gap-1.5 px-2 py-0.5 rounded border border-cyan-500/40 bg-cyan-950/20 text-radio-cyan ${solvedCount > 0 ? motion.chipFlash : ""}`}
+        >
           <CheckCircle2 className="w-3 h-3 text-radio-cyan" />
           <span className="text-[10px] font-semibold tracking-wider">
             INVESTIGATION: {solvedCount}/3 RECONSTRUCTED
@@ -166,12 +175,9 @@ export const StatusBar: React.FC<StatusBarProps> = ({ onExit }) => {
 
         {/* Investigation Board */}
         <button
-          onClick={() => {
-            if (audioEnabled) sound.playClick();
-            openInvestigationBoard();
-          }}
+          onClick={openInvestigationBoard}
           title="Open Investigation Board"
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-cyan-500/40 text-cyan-400 hover:bg-cyan-950/40 hover:border-cyan-400 transition-colors"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-cyan-500/40 text-cyan-400 hover:bg-cyan-950/40 hover:border-cyan-400 hover:shadow-cyan-glow transition-all duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cyan-300/70"
         >
           <GitBranch className="w-3.5 h-3.5" />
           <span className="text-[10px] uppercase font-bold hidden sm:inline">BOARD</span>

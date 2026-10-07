@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { StationId } from "../types/radio.types";
 import { CinematicRevealStage } from "../types/investigation.types";
 import { BLUE_ZONE_CONFIG } from "../data/config";
+import { BlueZoneChallengeId, ChallengeReward } from "../types/challenge.types";
 
 // HUD prompt shown when the player is within interaction range of a station
 export interface InteractionPrompt {
@@ -23,6 +24,14 @@ export interface BlueZoneState {
   challenge1Solved: boolean;
   challenge2Solved: boolean;
   challenge3Solved: boolean;
+  // CTF 03 (Voice Archive) is standalone: available from the start, unlocks nothing, not counted
+  // in the 3-challenge broadcast gate
+  ctf03Solved: boolean;
+  // CTF 04 (Signal Monitor) is standalone in the same way: unlocks nothing, not in the broadcast gate
+  ctf04Solved: boolean;
+
+  // Content released by verified flags (e.g. the CTF 01 recovered fragment used at the Network Map)
+  challengeRewards: Partial<Record<BlueZoneChallengeId, ChallengeReward>>;
 
   // Station unlock states (strictly enforced by CTF progression)
   terminalUnlocked: boolean;
@@ -64,9 +73,12 @@ export interface BlueZoneState {
   closeInvestigationBoard: () => void;
   setCinematicStage: (stage: CinematicRevealStage) => void;
 
-  solveChallenge1: () => void;
+  // Unlock order: CTF 01 (terminal) → CTF 02 (network map) → voice archive / signal monitor → broadcast
+  solveChallenge1: (reward?: ChallengeReward) => void;
   solveChallenge2: () => void;
-  solveChallenge3: () => void;
+  solveChallenge3: (reward?: ChallengeReward) => void;
+  solveCtf03: (reward?: ChallengeReward) => void;
+  solveCtf04: (reward?: ChallengeReward) => void;
 
   setInspectedFrequency: (freq: number) => void;
   addSystemLog: (log: string) => void;
@@ -88,6 +100,9 @@ export const useBlueZoneStore = create<BlueZoneState>((set) => ({
   challenge1Solved: false,
   challenge2Solved: false,
   challenge3Solved: false,
+  ctf03Solved: false,
+  ctf04Solved: false,
+  challengeRewards: {},
 
   terminalUnlocked: true,
   voiceArchiveUnlocked: false,
@@ -135,45 +150,78 @@ export const useBlueZoneStore = create<BlueZoneState>((set) => ({
   closeInvestigationBoard: () => set({ investigationBoardOpen: false }),
   setCinematicStage: (stage) => set({ cinematicStage: stage }),
 
-  solveChallenge1: () =>
-    set((state) => ({
-      challenge1Solved: true,
-      voiceArchiveUnlocked: true,
-      signalMonitorUnlocked: true,
-      discoveredSanctuaryIds: Array.from(new Set([...state.discoveredSanctuaryIds, "SANC-0003"])),
-      systemLogs: [
-        ...state.systemLogs,
-        "> COMMUNICATION FRAGMENT RECONSTRUCTED: SANC-0003 [RADIO SECTOR] CONFIRMED",
-        "> VOICE ARCHIVE BUFFER UNLOCKED",
-        "> SIGNAL MONITOR UNLOCKED",
-      ],
-    })),
+  // Solve actions are idempotent: a repeated call never re-completes or re-logs a challenge
+  solveChallenge1: (reward) =>
+    set((state) => {
+      if (state.challenge1Solved) return state;
+      return {
+        challenge1Solved: true,
+        networkUnlocked: true,
+        challengeRewards: reward ? { ...state.challengeRewards, "blue-zone-ctf-01": reward } : state.challengeRewards,
+        discoveredSanctuaryIds: Array.from(new Set([...state.discoveredSanctuaryIds, "SANC-0003"])),
+        systemLogs: [
+          ...state.systemLogs,
+          "> TRANSMISSION_07 RECONSTRUCTED: COMMUNICATION RESTORED",
+          "> NETWORK MAP UNLOCKED",
+        ],
+      };
+    }),
 
   solveChallenge2: () =>
-    set((state) => ({
-      challenge2Solved: true,
-      networkUnlocked: true,
-      discoveredSignals: Array.from(new Set([...state.discoveredSignals, "156.30 MHz (EMERGENCY REPEATER)"])),
-      systemLogs: [
-        ...state.systemLogs,
-        "> FAILED TRANSMISSION PATTERN CORRELATED: CARRIER WAVE LOCK AT 156.30 MHz CONFIRMED",
-        "> RESIDENT NETWORK TOPOLOGY UNLOCKED",
-      ],
-    })),
+    set((state) => {
+      if (state.challenge2Solved) return state;
+      return {
+        challenge2Solved: true,
+        broadcastUnlocked: state.challenge1Solved && state.challenge3Solved,
+        discoveredSignals: Array.from(new Set([...state.discoveredSignals, "156.30 MHz (EMERGENCY REPEATER)"])),
+        systemLogs: [
+          ...state.systemLogs,
+          "> FAILED TRANSMISSION PATTERN CORRELATED: CARRIER WAVE LOCK AT 156.30 MHz CONFIRMED",
+          "> EMERGENCY BROADCAST CONSOLE OVERRIDE COMPLETE",
+        ],
+      };
+    }),
 
-  solveChallenge3: () =>
-    set((state) => ({
-      challenge3Solved: true,
-      broadcastUnlocked: true,
-      discoveredConnections: Array.from(
-        new Set([...state.discoveredConnections, "SANC-0002 [RADIO NEXUS] → SANC-0034 [FORENSICS GATEWAY]"])
-      ),
-      systemLogs: [
-        ...state.systemLogs,
-        "> NETWORK ROUTE RECONSTRUCTED: SANC-0002 NEXUS LINKED TO FORENSICS GATEWAY SANC-0034",
-        "> EMERGENCY BROADCAST CONSOLE OVERRIDE COMPLETE",
-      ],
-    })),
+  solveChallenge3: (reward) =>
+    set((state) => {
+      if (state.challenge3Solved) return state;
+      return {
+        challenge3Solved: true,
+        voiceArchiveUnlocked: true,
+        signalMonitorUnlocked: true,
+        broadcastUnlocked: state.challenge1Solved && state.challenge2Solved,
+        challengeRewards: reward ? { ...state.challengeRewards, "blue-zone-ctf-02": reward } : state.challengeRewards,
+        discoveredConnections: Array.from(
+          new Set([...state.discoveredConnections, "SANC-0002 [RADIO NEXUS] → SANC-0034 [FORENSICS GATEWAY]"])
+        ),
+        systemLogs: [
+          ...state.systemLogs,
+          "> NETWORK ROUTE RESTORED: NODE COMMUNICATION DECRYPTED",
+          "> VOICE ARCHIVE BUFFER UNLOCKED",
+          "> SIGNAL MONITOR UNLOCKED",
+        ],
+      };
+    }),
+
+  solveCtf03: (reward) =>
+    set((state) => {
+      if (state.ctf03Solved) return state;
+      return {
+        ctf03Solved: true,
+        challengeRewards: reward ? { ...state.challengeRewards, "blue-zone-ctf-03": reward } : state.challengeRewards,
+        systemLogs: [...state.systemLogs, "> VOICE ARCHIVE VA-07 RECOVERED"],
+      };
+    }),
+
+  solveCtf04: (reward) =>
+    set((state) => {
+      if (state.ctf04Solved) return state;
+      return {
+        ctf04Solved: true,
+        challengeRewards: reward ? { ...state.challengeRewards, "blue-zone-ctf-04": reward } : state.challengeRewards,
+        systemLogs: [...state.systemLogs, "> SIGNAL MONITOR: NAVIGATION TARGET CONFIRMED"],
+      };
+    }),
 
   setInspectedFrequency: (freq) => set({ inspectedFrequency: freq }),
 
@@ -242,6 +290,9 @@ export const useBlueZoneStore = create<BlueZoneState>((set) => ({
       challenge1Solved: false,
       challenge2Solved: false,
       challenge3Solved: false,
+      ctf03Solved: false,
+      ctf04Solved: false,
+      challengeRewards: {},
       terminalUnlocked: true,
       voiceArchiveUnlocked: false,
       signalMonitorUnlocked: false,

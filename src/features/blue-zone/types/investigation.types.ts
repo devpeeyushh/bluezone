@@ -14,16 +14,3 @@ export type CinematicRevealStage =
   | "revealed"
   | "complete";
 
-export interface RadioTranscriptLine {
-  timestamp: string;
-  sender: string;
-  text: string;
-  isCorrupted?: boolean;
-}
-
-export interface RadioTranscript {
-  id: string;
-  title: string;
-  frequency: string;
-  lines: RadioTranscriptLine[];
-}

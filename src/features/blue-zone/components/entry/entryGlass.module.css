@@ -1,0 +1,162 @@
+/* Landing glass language: reserved for the primary action, the mission card, panels and small
+   status pills. Cursor-following highlight uses CSS variables (--mx/--my) written directly to the
+   element — no React state. Reduced motion removes displacement, sweeps and looping animation. */
+
+.glass {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.015) 42%, rgba(120, 220, 255, 0.025)),
+    rgba(8, 20, 36, 0.42);
+  border: 1px solid rgba(160, 225, 255, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 12px 40px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
+
+/* ---------------------------------------------------------------- primary CTA */
+
+.cta {
+  composes: glass;
+  --mx: 50%;
+  --my: 50%;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 999px;
+  transition:
+    transform 450ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    border-color 450ms ease,
+    box-shadow 450ms ease,
+    background-color 450ms ease;
+}
+/* Specular highlight that follows the cursor */
+.cta::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(160px circle at var(--mx) var(--my), rgba(190, 240, 255, 0.22), transparent 60%);
+  opacity: 0;
+  transition: opacity 400ms ease;
+}
+/* Reflection band that crosses the surface on hover */
+.cta::after {
+  content: "";
+  position: absolute;
+  top: -50%;
+  bottom: -50%;
+  left: -40%;
+  width: 30%;
+  z-index: -1;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+  transform: translateX(-120%) skewX(-12deg);
+  transition: transform 900ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.cta:hover,
+.cta:focus-visible {
+  transform: translateY(-2px) scale(1.015);
+  border-color: rgba(170, 235, 255, 0.36);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 16px 50px rgba(0, 0, 0, 0.4),
+    0 0 36px rgba(0, 200, 255, 0.14);
+  outline: none;
+}
+.cta:hover::before,
+.cta:focus-visible::before {
+  opacity: 1;
+}
+.cta:hover::after,
+.cta:focus-visible::after {
+  transform: translateX(560%) skewX(-12deg);
+}
+.cta:active {
+  transform: translateY(0) scale(0.995);
+}
+.ctaDot {
+  box-shadow: 0 0 0 4px rgba(0, 220, 255, 0.12);
+}
+.ctaArrow {
+  transition: transform 450ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.cta:hover .ctaArrow,
+.cta:focus-visible .ctaArrow {
+  transform: translateX(4px);
+}
+
+/* ---------------------------------------------------------------- secondary controls */
+
+.ghost {
+  composes: glass;
+  transition: border-color 300ms ease, background-color 300ms ease, transform 300ms ease;
+}
+.ghost:hover,
+.ghost:focus-visible {
+  border-color: rgba(170, 235, 255, 0.32);
+  background-color: rgba(14, 34, 58, 0.55);
+  outline: none;
+}
+
+/* ---------------------------------------------------------------- entrances */
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes panelIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.rise { animation: rise 900ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.panelIn { animation: panelIn 320ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.fadeIn { animation: fadeIn 260ms ease-out both; }
+
+/* Whole UI layer fades out when entering */
+.uiLeaving {
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 420ms ease, transform 600ms ease;
+  pointer-events: none;
+}
+/* Atmospheric hand-off veil (fades in at the end of the entry transition) */
+.veil {
+  opacity: 0;
+  transition: opacity 380ms ease-in;
+}
+.veilOn {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cta,
+  .cta:hover,
+  .cta:focus-visible,
+  .cta:active {
+    transform: none;
+  }
+  .cta::after {
+    display: none;
+  }
+  .ctaArrow,
+  .cta:hover .ctaArrow {
+    transform: none;
+  }
+  .rise,
+  .panelIn {
+    animation: fadeIn 200ms ease-out both;
+  }
+  .uiLeaving {
+    transform: none;
+    transition: opacity 180ms ease;
+  }
+  .veil {
+    transition: opacity 180ms ease-in;
+  }
+}

@@ -15,7 +15,10 @@ export type ProgressSnapshot = Pick<
   | "networkUnlocked"
   | "broadcastUnlocked"
   | "completed"
->;
+> & {
+  // Optional so existing snapshot builders stay valid; only the station tag/selector pass it
+  ctf03Solved?: boolean;
+};
 
 export interface StationStatusInfo {
   label: string; // short badge label
@@ -58,16 +61,16 @@ export function getStationStatus(id: StationId, s: ProgressSnapshot): StationSta
     case "communication-terminal":
       return s.challenge1Solved ? open("VERIFIED", COLOR.verified) : open("AVAILABLE", COLOR.cyan);
 
+    // Hosts the standalone CTF 03, so the station itself is never locked
     case "voice-archive":
-      if (!s.voiceArchiveUnlocked) return locked("COMPLETE CHALLENGE 01 // COMMUNICATION TERMINAL");
-      return s.challenge2Solved ? open("VERIFIED", COLOR.verified) : open("AVAILABLE", COLOR.cyanSoft);
+      return s.ctf03Solved ? open("VERIFIED", COLOR.verified) : open("AVAILABLE", COLOR.cyanSoft);
 
     case "signal-monitor":
-      if (!s.signalMonitorUnlocked) return locked("COMPLETE CHALLENGE 01 // COMMUNICATION TERMINAL");
+      if (!s.signalMonitorUnlocked) return locked("COMPLETE CTF 02 // NETWORK MAP");
       return s.challenge2Solved ? open("VERIFIED", COLOR.verified) : open("AVAILABLE", COLOR.amber);
 
     case "network-map":
-      if (!s.networkUnlocked) return locked("COMPLETE CHALLENGE 02 // SIGNAL MONITOR");
+      if (!s.networkUnlocked) return locked("COMPLETE CTF 01 // COMMUNICATION TERMINAL");
       return s.challenge3Solved ? open("VERIFIED", COLOR.verified) : open("AVAILABLE", COLOR.cyan);
 
     case "emergency-broadcast":

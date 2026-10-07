@@ -17,24 +17,25 @@ export function getCurrentObjective(s: ProgressSnapshot): ObjectiveInfo {
     return {
       id: "c1",
       step: 1,
-      text: "Reconstruct the degraded communication packet.",
+      text: "Reconstruct the intercepted transmission.",
       location: "COMMUNICATION TERMINAL",
+    };
+  }
+  // CTF 02 (challenge3Solved flag) comes before the voice/signal investigation
+  if (!s.challenge3Solved) {
+    return {
+      id: "c3",
+      step: 2,
+      text: "Find the compromised relay node and decrypt it.",
+      location: "NETWORK MAP",
     };
   }
   if (!s.challenge2Solved) {
     return {
       id: "c2",
-      step: 2,
+      step: 3,
       text: "Cross-reference failed transmission evidence.",
       location: "VOICE ARCHIVE // SIGNAL MONITOR",
-    };
-  }
-  if (!s.challenge3Solved) {
-    return {
-      id: "c3",
-      step: 3,
-      text: "Reconstruct the resident communication mesh.",
-      location: "NETWORK MAP",
     };
   }
   if (!s.completed) {

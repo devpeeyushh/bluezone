@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useBlueZoneStore } from "../../store/useBlueZoneStore";
 import { getCurrentObjective, OBJECTIVE_STEPS } from "../../utils/objectives";
+import motion from "./hudMotion.module.css";
 
 // How long "OBJECTIVE UPDATED" stays lit once the player is back in the facility view
 const UPDATE_FLASH_MS = 4000;
@@ -50,9 +51,10 @@ export const ObjectiveTracker: React.FC = () => {
   const showUpdated = updatePending;
 
   return (
-    <div className="absolute top-3 left-4 z-20 w-[17rem] max-w-[calc(100%-2rem)] pointer-events-none select-none font-mono">
+    // Re-enters with a short slide each time the player returns to the facility view
+    <div className={`${motion.panelIn} absolute top-3 left-4 z-20 w-[17rem] max-w-[calc(100%-2rem)] pointer-events-none select-none font-mono`}>
       <div
-        className={`rounded bg-black/90 backdrop-blur-sm border-l-2 border px-3 py-2 transition-colors duration-500 ${
+        className={`rounded bg-[#030b18]/65 backdrop-blur-md shadow-[0_0_28px_rgba(0,190,255,0.07),inset_0_1px_0_rgba(255,255,255,0.05)] border-l-2 border px-3 py-2 transition-colors duration-500 ${showUpdated ? motion.flash : ""} ${
           showUpdated
             ? "border-amber-400/70 border-l-amber-400"
             : isComplete
@@ -61,7 +63,12 @@ export const ObjectiveTracker: React.FC = () => {
         }`}
       >
         <div className="flex items-center justify-between text-[9px] tracking-[0.2em] font-bold">
-          <span className={showUpdated ? "text-amber-300" : isComplete ? "text-emerald-300" : "text-cyan-300"}>
+          <span className={`flex items-center gap-1.5 ${showUpdated ? "text-amber-300" : isComplete ? "text-emerald-300" : "text-cyan-300"}`}>
+            <span
+              className={`w-1 h-1 rounded-full ${isComplete && !showUpdated ? "" : motion.breathe} ${
+                showUpdated ? "bg-amber-300" : isComplete ? "bg-emerald-400" : "bg-cyan-300"
+              }`}
+            />
             {showUpdated ? "OBJECTIVE UPDATED" : "OBJECTIVE"}
           </span>
           <span className="text-slate-400 tracking-wider">
@@ -69,10 +76,13 @@ export const ObjectiveTracker: React.FC = () => {
           </span>
         </div>
 
-        <div className="mt-1 text-[11px] leading-snug text-radio-textBright">{objective.text}</div>
+        {/* Keyed on the objective so a new objective swaps in instead of replacing text in place */}
+        <div key={objective.id} className={motion.swapIn}>
+          <div className="mt-1 text-[11px] leading-snug text-radio-textBright">{objective.text}</div>
 
-        <div className="mt-1 text-[9px] tracking-wider text-slate-400 truncate">
-          {isComplete ? objective.location : `LOCATION // ${objective.location}`}
+          <div className="mt-1 text-[9px] tracking-wider text-slate-400 truncate">
+            {isComplete ? objective.location : `LOCATION // ${objective.location}`}
+          </div>
         </div>
 
         {sessionExpired && (
