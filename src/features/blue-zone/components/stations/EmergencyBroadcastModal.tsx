@@ -10,15 +10,16 @@ import { BLUE_ZONE_COMPLETION } from "../../data/completion";
 import { BlueZoneCompletionPayload } from "../../types/integration.types";
 import { isDatasetUnlocked } from "../../utils/finalAnswer";
 import { FinalTransmissionComplete, FinalTransmissionPuzzle } from "./broadcast/BroadcastPanels";
+import { TransmissionPuzzle } from "./broadcast/TransmissionPuzzle";
 
 interface Props {
   onClose: () => void;
   onComplete?: (payload: BlueZoneCompletionPayload) => void;
 }
 
-// Final transmission: the complete image is the reference; a correct answer completes the zone
-// through the existing path exactly once (setCompleted(true) + onComplete(BLUE_ZONE_COMPLETION))
-// and releases the complete Radio Communication dataset.
+// Final transmission: reconstruct the 4×4 jigsaw, then answer from the complete image. A correct
+// answer completes the zone through the existing path exactly once (setCompleted(true) +
+// onComplete(BLUE_ZONE_COMPLETION)) and releases the complete Radio Communication dataset.
 
 export const EmergencyBroadcastModal: React.FC<Props> = ({ onClose, onComplete }) => {
   const {
@@ -26,6 +27,7 @@ export const EmergencyBroadcastModal: React.FC<Props> = ({ onClose, onComplete }
     challenge1Solved,
     challenge2Solved,
     challenge3Solved,
+    cinematicStage,
     setCinematicStage,
     setCompleted,
     completed,
@@ -35,6 +37,7 @@ export const EmergencyBroadcastModal: React.FC<Props> = ({ onClose, onComplete }
       challenge1Solved: s.challenge1Solved,
       challenge2Solved: s.challenge2Solved,
       challenge3Solved: s.challenge3Solved,
+      cinematicStage: s.cinematicStage,
       setCinematicStage: s.setCinematicStage,
       setCompleted: s.setCompleted,
       completed: s.completed,
@@ -53,6 +56,9 @@ export const EmergencyBroadcastModal: React.FC<Props> = ({ onClose, onComplete }
 
   // True when the answer was verified in this console, so the completion view animates in only then
   const justSolvedRef = useRef(false);
+
+  // Jigsaw solved: move on to the answer step (stage lives in the store, so reopening keeps it)
+  const handleReconstructed = useCallback(() => setCinematicStage("revealed"), [setCinematicStage]);
 
   const handleSolved = useCallback(() => {
     setDatasetReady(true);
@@ -156,8 +162,22 @@ export const EmergencyBroadcastModal: React.FC<Props> = ({ onClose, onComplete }
               />
             </div>
           ) : (
-            /* ===== FINAL PUZZLE ===== */
-            <FinalTransmissionPuzzle onSolved={handleSolved} />
+            /* ===== FINAL PUZZLE: answer from the reconstructed image ===== */
+            cinematicStage === "revealed" ? (
+              <FinalTransmissionPuzzle onSolved={handleSolved} />
+            ) : (
+              /* ===== RECONSTRUCTION: shuffled 4×4 jigsaw, always starts unsolved ===== */
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="text-[10px] tracking-[0.35em] text-red-300 font-bold">FINAL TRANSMISSION</div>
+                    <div className="text-sm font-bold tracking-[0.25em] text-radio-textBright">RECONSTRUCTING VISUAL RECORD</div>
+                  </div>
+                  <div className="text-[10px] tracking-[0.2em] text-amber-300">VISUAL RECORD // CORRUPTED</div>
+                </div>
+                <TransmissionPuzzle onSolved={handleReconstructed} />
+              </div>
+            )
           )}
         </div>
       </div>

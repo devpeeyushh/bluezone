@@ -1,12 +1,14 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
-import { X, Lightbulb, ChevronRight } from "lucide-react";
-import { useShallow } from "zustand/react/shallow";
-import { HINTS_DATABASE } from "../../data/hints";
+import { X, Lightbulb, ExternalLink } from "lucide-react";
 import { useBlueZoneStore } from "../../store/useBlueZoneStore";
 import { sound } from "../../utils/sound";
 import { useModalEntrance } from "../../utils/useModalEntrance";
+
+// Blue Zone help: the advisory points players to the Blue Zone Discord instead of tiered hints.
+// Scoped to this component (rendered only by Blue Zone stations); not a shared or global link.
+const DISCORD_INVITE = "https://discord.gg/EPwduT4Xx";
 
 interface HintModalProps {
   challengeId: string;
@@ -14,14 +16,8 @@ interface HintModalProps {
   onClose: () => void;
 }
 
-export const HintModal: React.FC<HintModalProps> = ({
-  challengeId,
-  challengeTitle,
-  onClose,
-}) => {
-  const { activeHints, requestHint, audioEnabled } = useBlueZoneStore(
-    useShallow((s) => ({ activeHints: s.activeHints, requestHint: s.requestHint, audioEnabled: s.audioEnabled }))
-  );
+export const HintModal: React.FC<HintModalProps> = ({ challengeTitle, onClose }) => {
+  const audioEnabled = useBlueZoneStore((s) => s.audioEnabled);
   const panelRef = useModalEntrance<HTMLDivElement>();
 
   // ESC closes only this advisory layer, not the station underneath. Registered in the capture
@@ -40,14 +36,6 @@ export const HintModal: React.FC<HintModalProps> = ({
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, []);
-
-  const hintsList = HINTS_DATABASE[challengeId] || [];
-  const currentUnlockedLevel = activeHints[challengeId] || 0;
-
-  const handleRequestNextHint = () => {
-    if (audioEnabled) sound.hint();
-    requestHint(challengeId);
-  };
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-sm">
@@ -74,59 +62,21 @@ export const HintModal: React.FC<HintModalProps> = ({
 
         {/* Content */}
         <div className="p-5 space-y-4 overflow-y-auto">
-          <p className="text-xs text-slate-300 leading-relaxed">
-            Advisory telemetry can assist in correlating degraded evidence. Hints guide your reasoning without disclosing canonical data.
-          </p>
-
-          <div className="space-y-3">
-            {hintsList.map((hint) => {
-              const isUnlocked = currentUnlockedLevel >= hint.level;
-              return (
-                <div
-                  key={hint.level}
-                  className={`p-3.5 rounded border transition-all ${
-                    isUnlocked
-                      ? "border-amber-500/50 bg-amber-950/20 text-slate-200"
-                      : "border-slate-800 bg-black/40 text-slate-400"
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-[10px] font-bold tracking-wider mb-1">
-                    <span className={isUnlocked ? "text-amber-400" : "text-slate-400"}>
-                      CLUE TIER 0{hint.level} // {hint.title}
-                    </span>
-                    <span>{isUnlocked ? "UNLOCKED" : "LOCKED"}</span>
-                  </div>
-
-                  {isUnlocked ? (
-                    <p className="text-xs text-amber-100/90 leading-relaxed mt-1">
-                      {hint.clue}
-                    </p>
-                  ) : (
-                    <p className="text-xs text-slate-400 italic mt-1">
-                      [Encrypted advisory buffer. Request hint tier below.]
-                    </p>
-                  )}
-                </div>
-              );
-            })}
+          <div>
+            <div className="text-sm font-bold tracking-[0.2em] text-amber-200">NEED ASSISTANCE?</div>
+            <p className="mt-1.5 text-xs text-slate-300 leading-relaxed">Join the Blue Zone community on Discord for help.</p>
           </div>
-
-          {/* Action button */}
-          {currentUnlockedLevel < hintsList.length ? (
-            <div className="pt-2 flex justify-end">
-              <button
-                onClick={handleRequestNextHint}
-                className="flex items-center gap-2 px-3.5 py-1.5 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-300 text-xs font-bold transition-all shadow-amber-glow"
-              >
-                <span>REQUEST TIER 0{currentUnlockedLevel + 1} HINT</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ) : (
-            <div className="text-[11px] text-emerald-400 text-center font-semibold pt-1">
-              ALL INVESTIGATION ADVISORIES UNLOCKED
-            </div>
-          )}
+          <a
+            href={DISCORD_INVITE}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Join the Discord server (opens discord.gg in a new tab)"
+            className="flex w-full items-center justify-center gap-2 px-4 py-2.5 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-200 text-xs font-bold tracking-wider transition-all shadow-amber-glow focus:outline-none focus-visible:ring-1 focus-visible:ring-amber-300"
+          >
+            <span>JOIN THE DISCORD SERVER</span>
+            <ExternalLink className="w-3.5 h-3.5" aria-hidden />
+          </a>
+          <p className="text-[10px] text-radio-textMuted text-center tracking-wider">OPENS DISCORD.GG IN A NEW TAB</p>
         </div>
       </div>
     </div>

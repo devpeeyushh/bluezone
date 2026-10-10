@@ -67,7 +67,7 @@ export const FinalTransmissionPuzzle: React.FC<{ onSolved: () => void }> = ({ on
         rel="noopener noreferrer"
         aria-label="Transmission image. Opens the full-resolution image in a new tab."
         className="relative block mx-auto aspect-[3/2] w-full overflow-hidden rounded border border-cyan-500/40 bg-black shadow-[0_0_24px_rgba(34,211,238,0.08)] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
-        style={{ maxWidth: "calc((92vh - 290px) * 1.5)" }}
+        style={{ maxWidth: "max(18rem, calc((92vh - 290px) * 1.5))" }}
       >
         <Image
           src={facilityRecord}
